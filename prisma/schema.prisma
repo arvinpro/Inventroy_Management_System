@@ -1,0 +1,112 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id          Int       @id @default(autoincrement())
+  email       String    @unique
+  password    String
+  role        String    @default("admin")
+  resetToken  String?
+  tokenExpiry DateTime?
+}
+
+model Staff {
+  id          Int       @id @default(autoincrement())
+  email       String    @unique
+  password    String
+  role        String    @default("staff")
+  resetToken  String?
+  tokenExpiry DateTime?
+}
+
+model Book {
+  id         Int        @id @default(autoincrement())
+  title      String
+  author     String
+  price      Float
+  quantity   Int
+  category   Category?  @relation(fields: [categoryId], references: [id])
+  categoryId Int? // foreign key
+  createdAt  DateTime   @default(now())
+  saleItems  SaleItem[] @relation("BookSales")
+}
+
+model Category {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  books       Book[] // <-- Add this opposite relation
+  items       Item[]
+  createdAt   DateTime @default(now())
+}
+
+model Item {
+  id         Int        @id @default(autoincrement())
+  name       String
+  quantity   Int
+  price      Float
+  categoryId Int?
+  category   Category?  @relation(fields: [categoryId], references: [id])
+  saleItems  SaleItem[]
+  createdAt  DateTime   @default(now())
+}
+
+model Customer {
+  id        Int          @id @default(autoincrement())
+  name      String
+  email     String
+  phone     String?
+  address   String?
+  type      CustomerType @default(CUSTOMER)
+  orders    Order[]
+  createdAt DateTime     @default(now())
+}
+
+enum CustomerType {
+  CUSTOMER
+  RETAILER
+}
+
+model Order {
+  id            Int           @id @default(autoincrement())
+  customerId    Int
+  customer      Customer      @relation(fields: [customerId], references: [id])
+  totalAmount   Float
+  paidAmount    Float         @default(0)
+  paymentStatus PaymentStatus @default(PENDING)
+  createdAt     DateTime      @default(now())
+  sales         Sale[]
+}
+
+enum PaymentStatus {
+  PENDING
+  PARTIAL
+  PAID
+}
+
+model Sale {
+  id         Int        @id @default(autoincrement())
+  orderId    Int
+  order      Order      @relation(fields: [orderId], references: [id])
+  totalPrice Float
+  createdAt  DateTime   @default(now())
+  saleItems  SaleItem[]
+}
+
+model SaleItem {
+  id       Int   @id @default(autoincrement())
+  saleId   Int
+  sale     Sale  @relation(fields: [saleId], references: [id])
+  itemId   Int?
+  item     Item? @relation(fields: [itemId], references: [id])
+  bookId   Int?
+  book     Book? @relation("BookSales", fields: [bookId], references: [id])
+  quantity Int
+  price    Float
+}

@@ -1,0 +1,40 @@
+import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+
+export interface Item {
+  id: number;
+  name: string;
+  category: string;
+  quantity: number;
+  price: number;
+}
+
+interface ItemsState {
+  items: Item[];
+}
+
+const initialState: ItemsState = {
+  items: [],
+};
+
+const itemsSlice = createSlice({
+  name: 'items',
+  initialState,
+  reducers: {
+    setItems: (state, action: PayloadAction<Item[]>) => {
+      state.items = action.payload;
+    },
+    addItem: (state, action: PayloadAction<Item>) => {
+      state.items.push(action.payload);
+    },
+    updateItem: (state, action: PayloadAction<Item>) => {
+      const index = state.items.findIndex(i => i.id === action.payload.id);
+      if (index !== -1) state.items[index] = action.payload;
+    },
+    deleteItem: (state, action: PayloadAction<number>) => {
+      state.items = state.items.filter(i => i.id !== action.payload);
+    },
+  },
+});
+
+export const { setItems, addItem, updateItem, deleteItem } = itemsSlice.actions;
+export default itemsSlice.reducer;

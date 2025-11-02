@@ -1,0 +1,842 @@
+"use client";
+import { ResponsiveContainer, PolarAngleAxis } from "recharts";
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+} from "@/components/ui/card";
+import {
+  Tooltip,
+  TooltipProvider,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
+import { Box, Book, Package, CircleDollarSign } from "lucide-react";
+import { BarChart, PieChart, LineChart, ScatterChart } from "@mui/x-charts";
+import { TrendingUp } from "lucide-react";
+import {
+  Label,
+  PolarGrid,
+  PolarRadiusAxis,
+  RadialBar,
+  RadialBarChart,
+} from "recharts";
+import { ChartConfig, ChartContainer } from "@/components/ui/chart";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+
+// ---------------------- Types ----------------------
+type Book = {
+  id: number;
+  title: string;
+  author: string;
+  quantity: number;
+  price: number;
+};
+type Item = { id: number; name: string; quantity: number; price: number };
+type CustomerType = "CUSTOMER" | "RETAILER";
+type Customer = {
+  id: number;
+  name: string;
+  email: string;
+  phone?: string;
+  address?: string;
+  type: CustomerType;
+};
+
+// ---------------------- Component ----------------------
+export default function Dashboard() {
+  const [books, setBooks] = useState<Book[]>([]);
+  const [items, setItems] = useState<Item[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [totalCustomers, setTotalCustomers] = useState(0);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+
+  // Pagination states
+  const [bookPage, setBookPage] = useState(1);
+  const [itemPage, setItemPage] = useState(1);
+  const [customerPage, setCustomerPage] = useState(1);
+  const [totalBooks, setTotalBooks] = useState(0);
+  const [totalItems, setTotalItems] = useState(0);
+
+  useEffect(() => {
+    fetchBooks();
+    fetchItems();
+    fetchCustomers();
+  }, [bookPage, itemPage, customerPage]);
+
+  const fetchBooks = async () => {
+    try {
+      const res = await axios.get("/api/books", {
+        params: { page: bookPage, limit },
+      });
+      setBooks(res.data.books || res.data);
+      setTotalBooks(res.data.total || res.data.length);
+    } catch (err) {
+      console.error("Error fetching books:", err);
+    }
+  };
+
+  const fetchItems = async () => {
+    try {
+      const res = await axios.get("/api/items", {
+        params: { page: itemPage, limit },
+      });
+      setItems(res.data.items || res.data);
+      setTotalItems(res.data.total || res.data.length);
+    } catch (err) {
+      console.error("Error fetching items:", err);
+    }
+  };
+
+  // ---------------------- Fetch Data ----------------------
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchData = async () => {
+      try {
+        const [booksRes, itemsRes] = await Promise.all([
+          axios.get("/api/books"),
+          axios.get("/api/items"),
+        ]);
+
+        if (!mounted) return;
+
+        // Ensure numbers
+        setBooks(
+          booksRes.data.map((b: Book) => ({
+            ...b,
+            quantity: Number(b.quantity),
+            price: Number(b.price),
+          }))
+        );
+        setItems(
+          itemsRes.data.map((i: Item) => ({
+            ...i,
+            quantity: Number(i.quantity),
+            price: Number(i.price),
+          }))
+        );
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    fetchData();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const fetchCustomers = async () => {
+    try {
+      const res = await axios.get("/api/customer", { params: { page, limit } });
+      setCustomers(res.data.customers);
+      setTotalCustomers(res.data.total);
+    } catch (error) {
+      console.error("Error fetching customers:", error);
+    }
+  };
+
+  // ---------------------- Totals ----------------------
+  const totalBooksStock = books.reduce((sum, b) => sum + b.quantity, 0);
+  const totalItemsStock = items.reduce((sum, i) => sum + i.quantity, 0);
+  const totalBooksValue = books.reduce(
+    (sum, b) => sum + b.quantity * b.price,
+    0
+  );
+  const totalItemsValue = items.reduce(
+    (sum, i) => sum + i.quantity * i.price,
+    0
+  );
+  const totalStock = totalBooksStock + totalItemsStock;
+  const totalValue = totalBooksValue + totalItemsValue;
+
+  const totalPagesBooks = Math.ceil(totalBooks / limit) || 1;
+  const totalPagesItems = Math.ceil(totalItems / limit) || 1;
+  const totalPagesCustomers = Math.ceil(totalCustomers / limit) || 1;
+
+  const currency = (n: number) =>
+    n.toLocaleString(undefined, {
+      style: "currency",
+      currency: "NPR",
+      maximumFractionDigits: 0,
+    });
+
+  const totalPages = Math.ceil(totalCustomers / limit) || 1;
+
+  // ---------------------- Charts Data ----------------------
+  const barData = [
+    {
+      category: "Books",
+      stock: books.reduce((sum, b) => sum + Number(b.quantity || 0), 0),
+      revenue: books.reduce(
+        (sum, b) => sum + (Number(b.quantity) * Number(b.price) || 0),
+        0
+      ),
+    },
+    {
+      category: "Items",
+      stock: items.reduce((sum, i) => sum + Number(i.quantity || 0), 0),
+      revenue: items.reduce(
+        (sum, i) => sum + (Number(i.quantity) * Number(i.price) || 0),
+        0
+      ),
+    },
+  ];
+
+  console.log("📊 barData:", barData);
+
+  const pieData = [
+    { id: 0, value: totalBooksValue, label: "Books Revenue" },
+    { id: 1, value: totalItemsValue, label: "Items Revenue" },
+  ];
+
+  const lineData = [
+    { x: 1, y: totalBooksStock },
+    { x: 2, y: totalItemsStock },
+    { x: 3, y: totalStock },
+  ];
+
+  const scatterData = [
+    { x: totalBooksStock, y: totalBooksValue },
+    { x: totalItemsStock, y: totalItemsValue },
+  ];
+
+  const chartData = [
+    {
+      browser: "safari",
+      visitors: totalCustomers,
+      fill: "var(--color-safari)",
+    },
+  ];
+  const chartConfig: ChartConfig = {
+    visitors: { label: "Visitors" },
+    safari: { label: "Safari", color: "var(--chart-2)" },
+  };
+
+  const totalBookTypes = books.length;
+  const totalBookQuantity = books.reduce(
+    (acc, book) => acc + (book.quantity || 0),
+    0
+  );
+
+  const totalItemTypes = items.length;
+  const totalItemQuantity = items.reduce(
+    (acc, item) => acc + (item.quantity || 0),
+    0
+  );
+
+  // ---------------------- Render ----------------------
+  return (
+    <div className="p-6 space-y-10 min-h-screen">
+      <div className="flex justify-between">
+        <h1 className="text-4xl font-bold text-gray-800">Dashboard</h1>
+      </div>
+
+      {/* ---------------------- Summary Cards ---------------------- */}
+      <TooltipProvider>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 text-white">
+          <Card className="hover:shadow-lg transition-all bg-gray-900">
+            <CardHeader className="flex justify-between items-center">
+              <div>
+                <CardTitle className="text-sm text-white">
+                  Total Stock
+                </CardTitle>
+                <p className="text-2xl font-bold text-white">{totalStock}</p>
+              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
+                    <Box className="w-6 h-6" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Combined quantity of all books and items
+                </TooltipContent>
+              </Tooltip>
+            </CardHeader>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-all bg-gray-900">
+            <CardHeader className="flex justify-between items-center">
+              <div>
+                <CardTitle className="text-sm text-white">
+                  Total Revenue
+                </CardTitle>
+                <p className="text-2xl font-bold text-white">
+                  {currency(totalValue)}
+                </p>
+              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+                    <CircleDollarSign className="w-6 h-6" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>Total estimated inventory value</TooltipContent>
+              </Tooltip>
+            </CardHeader>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-all bg-gray-900">
+            <CardHeader className="flex justify-between items-center">
+              <div>
+                <CardTitle className="text-sm text-white">
+                  Books Stock
+                </CardTitle>
+                <p className="text-xl font-bold text-blue-600">
+                  Quantity : {totalBooksStock}
+                </p>
+
+                <p className="text-sm text-gray-200">
+                  Revenue: {currency(totalBooksValue)}
+                </p>
+              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="p-3 bg-violet-50 text-violet-600 rounded-xl">
+                    <Book className="w-6 h-6" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>All books stock and value</TooltipContent>
+              </Tooltip>
+            </CardHeader>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-all bg-gray-900">
+            <CardHeader className="flex justify-between items-center">
+              <div>
+                <CardTitle className="text-sm text-white">
+                  Items Stock
+                </CardTitle>
+                <p className="text-xl font-bold text-blue-600">
+                  Quantity : {totalItemsStock}
+                </p>
+                <p className="text-sm text-gray-200">
+                  Revenue: {currency(totalItemsValue)}
+                </p>
+              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="p-3 bg-rose-50 text-rose-600 rounded-xl">
+                    <Package className="w-6 h-6" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>Other items stock and value</TooltipContent>
+              </Tooltip>
+            </CardHeader>
+          </Card>
+        </div>
+      </TooltipProvider>
+
+      {/* ---------------------- Charts ---------------------- */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 ">
+        {/* Bar Chart */}
+        <Card className="col-span-2">
+          <CardHeader>
+            <CardTitle>📊 Stock vs Revenue (Bar Chart)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {books.length > 0 && items.length > 0 ? (
+              <BarChart
+                height={320}
+                xAxis={[
+                  {
+                    scaleType: "band",
+                    data: barData.map((d) => d.category),
+                    label: "Category",
+                  },
+                ]}
+                yAxis={[
+                  { id: "stock", label: "Stock", position: "left" },
+                  { id: "revenue", label: "Revenue ($)", position: "right" },
+                ]}
+                series={[
+                  {
+                    data: barData.map((d) => Number(d.stock) || 0),
+                    label: "Stock",
+                    color: "#3b82f6",
+                    yAxisId: "stock",
+                  },
+                  {
+                    data: barData.map((d) => Number(d.revenue) || 0),
+                    label: "Revenue",
+                    color: "#22c55e",
+                    yAxisId: "revenue",
+                  },
+                ]}
+                grid={{ vertical: true, horizontal: true }}
+                slotProps={{
+                  legend: {
+                    position: { vertical: "bottom", horizontal: "center" },
+                  },
+                }}
+                margin={{ top: 30, right: 40, bottom: 50, left: 50 }}
+                sx={{
+                  "& .MuiBarElement-root": {
+                    borderRadius: 6,
+                  },
+                  "& .MuiChartsAxis-tickLabel": {
+                    fontSize: 12,
+                  },
+                }}
+                // ✅ Adjust spacing visually with `sx`, not barGap/barCategoryGap
+              />
+            ) : (
+              <p className="text-gray-500 text-center">Loading chart data...</p>
+            )}
+          </CardContent>z
+        </Card>
+
+        {/* Pie Chart */}
+        <Card className="bg-gradient-to-br from-[#dbe9b7] via-[#fdfdf6] to-[#f4dada]">
+          <CardHeader className="items-center pb-4">
+            <CardTitle>Revenue Comparison</CardTitle>
+            <CardDescription>
+              Books vs Items Revenue Distribution
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pb-0">
+            <ChartContainer
+              config={chartConfig}
+              className="mx-auto aspect-square max-h-[250px]"
+            >
+              <PieChart
+                series={[
+                  {
+                    data: [
+                      { id: 0, value: totalBooksValue, label: "Books" },
+                      { id: 1, value: totalItemsValue, label: "Items" },
+                    ],
+                    innerRadius: 70,
+                    outerRadius: 110,
+                    paddingAngle: 4,
+                    cornerRadius: 5,
+                  },
+                ]}
+                height={220}
+              />
+            </ChartContainer>
+          </CardContent>
+          <CardFooter className="flex-col gap-2 text-sm">
+            <div>Total: {currency(totalValue)}</div>
+            <div>
+              Books: {currency(totalBooksValue)} | Items:{" "}
+              {currency(totalItemsValue)}
+            </div>
+          </CardFooter>
+        </Card>
+
+        {/* Line Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle>📈 Stock Growth (Line Chart)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <LineChart
+              xAxis={[
+                { data: lineData.map((d) => d.x), label: "Category Index" },
+              ]}
+              series={[
+                { data: lineData.map((d) => d.y), label: "Stock Count" },
+              ]}
+              height={340}
+              width={400}
+            />
+          </CardContent>
+        </Card>
+
+        {/* 👥 Customers & Retailers Full-Circle Radial Charts */}
+        <Card className="flex flex-col">
+          <CardHeader>
+            <CardTitle>👥 Customers & Retailers Overview</CardTitle>
+            <CardDescription>Total Registered Users</CardDescription>
+          </CardHeader>
+
+          <CardContent className="flex justify-around items-center pb-4">
+            {/* ---------- Customers Chart ---------- */}
+            <div className="flex flex-col items-center">
+              <ResponsiveContainer width={180} height={180}>
+                <RadialBarChart
+                  cx="50%"
+                  cy="50%"
+                  innerRadius="70%"
+                  outerRadius="100%"
+                  barSize={20}
+                  startAngle={90}
+                  endAngle={450} // Full circle
+                  data={[
+                    {
+                      name: "Customers",
+                      value: customers.filter((c) => c.type === "CUSTOMER")
+                        .length,
+                      fill: "#008b8b", // Emerald
+                    },
+                  ]}
+                >
+                  <PolarAngleAxis
+                    type="number"
+                    domain={[
+                      0,
+                      Math.max(
+                        customers.filter((c) => c.type === "CUSTOMER").length,
+                        customers.filter((c) => c.type === "RETAILER").length,
+                        1
+                      ),
+                    ]}
+                    tick={false}
+                  />
+                  <RadialBar
+                    dataKey="value"
+                    background={{ fill: "#f3f4f6" }}
+                    cornerRadius={20}
+                  />
+                </RadialBarChart>
+              </ResponsiveContainer>
+              <p className="mt-2 text-xl font-bold">
+                {customers.filter((c) => c.type === "CUSTOMER").length}
+              </p>
+              <p className="text-sm text-muted-foreground">Customers</p>
+            </div>
+
+            {/* ---------- Retailers Chart ---------- */}
+            <div className="flex flex-col items-center">
+              <ResponsiveContainer width={180} height={180}>
+                <RadialBarChart
+                  cx="50%"
+                  cy="50%"
+                  innerRadius="70%"
+                  outerRadius="100%"
+                  barSize={20}
+                  startAngle={90}
+                  endAngle={450} // Full circle
+                  data={[
+                    {
+                      name: "Retailers",
+                      value: customers.filter((c) => c.type === "RETAILER")
+                        .length,
+                      fill: "#663399", // Rose
+                    },
+                  ]}
+                >
+                  <PolarAngleAxis
+                    type="number"
+                    domain={[
+                      0,
+                      Math.max(
+                        customers.filter((c) => c.type === "CUSTOMER").length,
+                        customers.filter((c) => c.type === "RETAILER").length,
+                        1
+                      ),
+                    ]}
+                    tick={false}
+                  />
+                  <RadialBar
+                    dataKey="value"
+                    background={{ fill: "#f3f4f6" }}
+                    cornerRadius={20}
+                  />
+                </RadialBarChart>
+              </ResponsiveContainer>
+              <p className="mt-2 text-xl font-bold">
+                {customers.filter((c) => c.type === "RETAILER").length}
+              </p>
+              <p className="text-sm text-muted-foreground">Retailers</p>
+            </div>
+          </CardContent>
+
+          <CardFooter className="flex flex-col gap-2 text-sm">
+            <div className="flex items-center gap-2 leading-none font-medium">
+              <TrendingUp className="h-4 w-4 text-emerald-500" />
+              Total Customers:{" "}
+              {customers.filter((c) => c.type === "CUSTOMER").length} |
+              Retailers: {customers.filter((c) => c.type === "RETAILER").length}
+            </div>
+            <div className="text-muted-foreground leading-none">
+              Data reflects current registered users.
+            </div>
+          </CardFooter>
+        </Card>
+
+        {/* 📊 Combined Pie Chart for Books & Items */}
+        <Card className="col-span-1 bg-gradient-to-br from-[#f8fafc] via-[#f0fdf4] to-[#fef2f2]">
+          <CardHeader className="items-center pb-4">
+            <CardTitle>📘 Books & 🧰 Items Overview</CardTitle>
+            <CardDescription>
+              Total Types vs Quantities Distribution
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent className="pb-0">
+            <ChartContainer
+              config={{
+                value: { label: "Value" },
+                books: { label: "Books", color: "#10b981" }, // Emerald
+                items: { label: "Items", color: "#f43f5e" }, // Rose
+              }}
+              className="mx-auto aspect-square max-h-[280px]"
+            >
+              <PieChart
+                series={[
+                  {
+                    data: [
+                      {
+                        id: "books",
+                        value: totalBookTypes + totalBookQuantity,
+                        label: "Books",
+                        color: "#10b981", // Emerald
+                      },
+                      {
+                        id: "items",
+                        value: totalItemTypes + totalItemQuantity,
+                        label: "Items",
+                        color: "#f43f5e", // Rose
+                      },
+                    ],
+                    innerRadius: 70,
+                    outerRadius: 110,
+                    paddingAngle: 5,
+                    cornerRadius: 6,
+                  },
+                ]}
+                height={240}
+              />
+            </ChartContainer>
+          </CardContent>
+
+          <CardFooter className="flex flex-col gap-2 text-sm text-gray-600">
+            <div className="flex items-center justify-between w-full">
+              <span className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-[#10b981]" />
+                <span>📘 Books</span>
+              </span>
+              <span>
+                {totalBookTypes} types / {totalBookQuantity} qty
+              </span>
+            </div>
+            <div className="flex items-center justify-between w-full">
+              <span className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-[#f43f5e]" />
+                <span>🧰 Items</span>
+              </span>
+              <span>
+                {totalItemTypes} types / {totalItemQuantity} qty
+              </span>
+            </div>
+          </CardFooter>
+        </Card>
+      </div>
+
+      {/* ---------------------- Tables ---------------------- */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Books Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Books</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-100">
+                  <TableHead>#</TableHead>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Author</TableHead>
+                  <TableHead>Quantity</TableHead>
+                  <TableHead>Price</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {books.map((book, i) => (
+                  <TableRow key={book.id}>
+                    <TableCell>{i + 1}</TableCell>
+                    <TableCell>{book.title}</TableCell>
+                    <TableCell>{book.author}</TableCell>
+                    <TableCell>{book.quantity}</TableCell>
+                    <TableCell>{currency(book.price)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {/* Pagination */}
+            <div className="mt-4 flex justify-center">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => setBookPage((p) => Math.max(1, p - 1))}
+                      className={
+                        bookPage === 1 ? "opacity-50 pointer-events-none" : ""
+                      }
+                    />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <span className="px-3 py-1 text-sm font-medium">
+                      Page {bookPage} of {totalPagesBooks}
+                    </span>
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() =>
+                        setBookPage((p) => Math.min(totalPagesBooks, p + 1))
+                      }
+                      className={
+                        bookPage === totalPagesBooks
+                          ? "opacity-50 pointer-events-none"
+                          : ""
+                      }
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Items Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Items</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-100">
+                  <TableHead>#</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Quantity</TableHead>
+                  <TableHead>Price</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.map((item, i) => (
+                  <TableRow key={item.id}>
+                    <TableCell>{i + 1}</TableCell>
+                    <TableCell>{item.name}</TableCell>
+                    <TableCell>{item.quantity}</TableCell>
+                    <TableCell>{currency(item.price)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {/* Pagination */}
+            <div className="mt-4 flex justify-center">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => setItemPage((p) => Math.max(1, p - 1))}
+                      className={
+                        itemPage === 1 ? "opacity-50 pointer-events-none" : ""
+                      }
+                    />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <span className="px-3 py-1 text-sm font-medium">
+                      Page {itemPage} of {totalPagesItems}
+                    </span>
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() =>
+                        setItemPage((p) => Math.min(totalPagesItems, p + 1))
+                      }
+                      className={
+                        itemPage === totalPagesItems
+                          ? "opacity-50 pointer-events-none"
+                          : ""
+                      }
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ---------------------- Customers Table ---------------------- */}
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Customers & Retailers</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-gray-100 ">
+                <TableHead>#</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Address</TableHead>
+                <TableHead>Type</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {customers.map((c, i) => (
+                <TableRow key={c.id}>
+                  <TableCell>{i + 1 + (page - 1) * limit}</TableCell>
+                  <TableCell>{c.name}</TableCell>
+                  <TableCell className="text-green-800">{c.email}</TableCell>
+                  <TableCell>{c.phone || "-"}</TableCell>
+                  <TableCell>{c.address || "-"}</TableCell>
+                  <TableCell>{c.type}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+
+          {/* Pagination */}
+          <div className="mt-4 flex justify-center">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className={
+                      page === 1 ? "opacity-50 pointer-events-none" : ""
+                    }
+                  />
+                </PaginationItem>
+                <PaginationItem>
+                  <span className="px-3 py-1 text-sm font-medium">
+                    Page {page} of {totalPages}
+                  </span>
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    className={
+                      page === totalPages
+                        ? "opacity-50 pointer-events-none"
+                        : ""
+                    }
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
