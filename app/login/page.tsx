@@ -114,7 +114,7 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
                 required
-                className="bg-white/10 border border-white/20 text-white placeholder-gray-300 focus:ring-2 focus:ring-blue-500"
+                className="bg-white/30 border border-white/20 text-white placeholder-gray-100 focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
@@ -130,7 +130,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
                 required
-                className="bg-white/10 border border-white/20 text-white placeholder-gray-300 focus:ring-2 focus:ring-blue-500"
+                className="bg-white/30 border border-white/20 text-white placeholder-gray-100 focus:ring-2 focus:ring-blue-500"
               />
 
               <div className="text-right">

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import { toast } from "sonner";
+import { useAppSelector } from "@/store/store";
 
 import {
   Button,
@@ -39,6 +40,7 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
+import { log } from "console";
 
 type Customer = { id: number; name: string };
 type Item = {
@@ -50,6 +52,7 @@ type Item = {
 };
 type Sale = {
   id: number;
+  orderId: number;
   customerId: number;
   productId: number;
   productType: "Book" | "Item";
@@ -81,12 +84,13 @@ export default function SalesForm() {
 
   const [pricePerUnit, setPricePerUnit] = useState(0);
 
-  // Search, sort, pagination
-  const [search, setSearch] = useState("");
+  // Sort, pagination
   const [sortField, setSortField] = useState<keyof Sale>("id");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  const search = useAppSelector((state) => state.search.query);
 
   // Fetch data
   useEffect(() => {
@@ -108,6 +112,7 @@ export default function SalesForm() {
           order.sales.flatMap((sale: any) =>
             sale.saleItems.map((si: any) => ({
               id: sale.id,
+              orderId: order.id,
               customerId: order.customerId,
               productId: si.itemId || si.bookId,
               productType: si.itemId ? "Item" : "Book",
@@ -206,6 +211,7 @@ export default function SalesForm() {
         res = await axios.post("/api/orders", payload);
         const newSale: Sale = {
           id: res.data.id,
+          orderId: res.data.id,
           customerId: form.customerId,
           productId: form.productId,
           productType: form.productType,
@@ -242,7 +248,7 @@ export default function SalesForm() {
   const handleDelete = async (id: number) => {
     try {
       await axios.delete(`/api/orders/${id}`);
-      setSales(sales.filter((s) => s.id !== id));
+      setSales(sales.filter((s) => s.orderId !== id));
       toast.success("Sale deleted successfully");
     } catch (err) {
       console.error(err);
@@ -268,15 +274,18 @@ export default function SalesForm() {
   // Filtered & sorted sales
   const filteredSales = useMemo(() => {
     const searched = sales.filter((s) => {
+      if (!search.trim()) return true;
       const customer =
         customers.find((c) => c.id === s.customerId)?.name.toLowerCase() || "";
       const product =
         [...books, ...items]
           .find((p) => p.id === s.productId)
           ?.name?.toLowerCase() || "";
+      const orderId = s.orderId.toString();
       return (
         customer.includes(search.toLowerCase()) ||
-        product.includes(search.toLowerCase())
+        product.includes(search.toLowerCase()) ||
+        orderId.includes(search)
       );
     });
 
@@ -321,7 +330,8 @@ export default function SalesForm() {
         <Input
           placeholder="Search by Customer or Product"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {}} // Search is now handled globally
+          disabled
         />
         <Select
           value={sortField}
@@ -419,7 +429,7 @@ export default function SalesForm() {
                   <Button
                     variant="destructive"
                     size="sm"
-                    onClick={() => handleDelete(s.id)}
+                    onClick={() => handleDelete(s.orderId)}
                   >
                     Delete
                   </Button>

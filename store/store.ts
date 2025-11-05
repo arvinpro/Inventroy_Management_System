@@ -4,12 +4,14 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { useDispatch, TypedUseSelectorHook, useSelector } from 'react-redux';
 import booksReducer from './features/booksSlice';
-import itemsReducer from './features/itemsSlice'
+import itemsReducer from './features/itemsSlice';
+import searchReducer from './features/searchSlice';
 
 export const store = configureStore({
   reducer: {
     books: booksReducer,
     items: itemsReducer,
+    search: searchReducer,
   },
 });
 

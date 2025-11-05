@@ -31,12 +31,79 @@ export async function GET() {
         (cat.items?.reduce((s, i) => s + i.price * i.quantity, 0) || 0),
     }));
 
+    // Additional metrics: orders, revenue, revenue by day, top selling items, recent orders, payment status counts
+    const totalOrders = await prisma.order.count();
+
+    const totalRevenueAgg = await prisma.sale.aggregate({ _sum: { totalPrice: true } });
+    const totalRevenue = totalRevenueAgg._sum.totalPrice || 0;
+
+    // Revenue by day (last 7 days)
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - 6);
+
+    const recentSales = await prisma.sale.findMany({
+      where: { createdAt: { gte: start } },
+      select: { createdAt: true, totalPrice: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const revenueByDayMap: Record<string, number> = {};
+    for (let i = 0; i < 7; i++) {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - (6 - i));
+      revenueByDayMap[d.toISOString().slice(0, 10)] = 0;
+    }
+
+    recentSales.forEach((s) => {
+      const key = s.createdAt.toISOString().slice(0, 10);
+      revenueByDayMap[key] = (revenueByDayMap[key] || 0) + Number(s.totalPrice || 0);
+    });
+
+    const revenueByDay = Object.entries(revenueByDayMap).map(([date, value]) => ({ date, value }));
+
+    // Top selling items (aggregate SaleItem by book or item name)
+    const saleItems = await prisma.saleItem.findMany({ include: { item: true, book: true } });
+
+    const topMap: Record<string, { name: string; quantity: number; revenue: number }> = {};
+    saleItems.forEach((si) => {
+      const name = si.item?.name || si.book?.title || `Unknown-${si.id}`;
+      if (!topMap[name]) topMap[name] = { name, quantity: 0, revenue: 0 };
+      topMap[name].quantity += si.quantity || 0;
+      topMap[name].revenue += (si.price || 0) * (si.quantity || 0);
+    });
+
+    const topSellingItems = Object.values(topMap).sort((a, b) => b.quantity - a.quantity).slice(0, 10);
+
+    // Recent orders
+    const recentOrders = await prisma.order.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+      include: { customer: true },
+    });
+
+    // Payment status counts
+    const paymentStatusCounts: Record<string, number> = {};
+    const statuses = ["PENDING", "PARTIAL", "PAID"];
+    for (const s of statuses) {
+      // @ts-ignore - dynamic enum key
+      paymentStatusCounts[s] = await prisma.order.count({ where: { paymentStatus: s } });
+    }
+
     return NextResponse.json({
       totalBooksStock,
       totalItemsStock,
       totalBooksValue,
       totalItemsValue,
       categoryReports,
+      // new
+      totalOrders,
+      totalRevenue,
+      revenueByDay,
+      topSellingItems,
+      recentOrders,
+      paymentStatusCounts,
     });
   } catch (error) {
     console.error("Error generating report:", error);

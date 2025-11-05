@@ -4,10 +4,10 @@ import prisma from "@/lib/prisma";
 // 🟢 UPDATE order
 export async function PUT(
   req: NextRequest,
-  context: { params: Promise<{ id: string }> } // <- params is now a Promise
+  context: { params: Promise<{ id: string }> } 
 ) {
   try {
-    const { id } = await context.params; // <-- await params
+     const { id } = await context.params; // 👈 await it
     const orderId = Number(id);
 
     if (!orderId) {
@@ -26,6 +26,7 @@ export async function PUT(
       where: { id: orderId },
       include: { sales: { include: { saleItems: true } } },
     });
+
     if (!existingOrder) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
@@ -47,11 +48,17 @@ export async function PUT(
     }
 
     // Delete old saleItems and sales
-    await prisma.saleItem.deleteMany({ where: { saleId: { in: existingOrder.sales.map(s => s.id) } } });
+    await prisma.saleItem.deleteMany({
+      where: { saleId: { in: existingOrder.sales.map((s) => s.id) } },
+    });
     await prisma.sale.deleteMany({ where: { orderId } });
 
     // Create new sales with saleItems
-    const totalAmount = items.reduce((sum: number, i: any) => sum + i.price * i.quantity, 0);
+    const totalAmount = items.reduce(
+      (sum: number, i: any) => sum + i.price * i.quantity,
+      0
+    );
+
     const updatedOrder = await prisma.order.update({
       where: { id: orderId },
       data: {
@@ -62,12 +69,14 @@ export async function PUT(
           create: [
             {
               totalPrice: totalAmount,
-              saleItems: { create: items.map((i: any) => ({
-                itemId: i.itemId,
-                bookId: i.bookId,
-                quantity: i.quantity,
-                price: i.price,
-              })) },
+              saleItems: {
+                create: items.map((i: any) => ({
+                  itemId: i.itemId,
+                  bookId: i.bookId,
+                  quantity: i.quantity,
+                  price: i.price,
+                })),
+              },
             },
           ],
         },
@@ -99,10 +108,10 @@ export async function PUT(
 // 🔴 DELETE order
 export async function DELETE(
   req: NextRequest,
-  context: { params: Promise<{ id: string }> } // <- params is a Promise
+  context: { params: Promise<{ id: string }> } // 👈 params is a Promise
 ) {
   try {
-    const { id } = await context.params; // <-- await params
+    const { id } = await context.params; // 👈 await it
     const orderId = Number(id);
 
     if (!orderId) {
@@ -113,6 +122,7 @@ export async function DELETE(
       where: { id: orderId },
       include: { sales: { include: { saleItems: true } } },
     });
+
     if (!existingOrder) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
@@ -133,8 +143,10 @@ export async function DELETE(
       }
     }
 
-    // Delete saleItems -> sales -> order
-    await prisma.saleItem.deleteMany({ where: { saleId: { in: existingOrder.sales.map(s => s.id) } } });
+    // Delete saleItems → sales → order
+    await prisma.saleItem.deleteMany({
+      where: { saleId: { in: existingOrder.sales.map((s) => s.id) } },
+    });
     await prisma.sale.deleteMany({ where: { orderId } });
     await prisma.order.delete({ where: { id: orderId } });
 
@@ -144,3 +156,4 @@ export async function DELETE(
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+

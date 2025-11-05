@@ -13,6 +13,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import Link from "next/link";
 import axios from "axios";
 import useSWR from "swr";
+import { useAppDispatch, useAppSelector } from "@/store/store";
+import { setSearchQuery } from "@/store/features/searchSlice";
 
 const fetcher = (url: string) => axios.get(url).then(res => res.data);
 
@@ -22,6 +24,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const [mounted, setMounted] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const dispatch = useAppDispatch();
+  const searchQuery = useAppSelector((state) => state.search.query);
 
   // SWR: fetch low stock every 10s
   const { data: lowStock = [] } = useSWR(
@@ -73,7 +77,12 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             </div>
 
             <div className="flex items-center space-x-4">
-              <Input placeholder="Search..." className="max-w-sm bg-white" />
+               <Input
+                 placeholder="Search orders..."
+                 className="max-w-sm bg-white"
+                 value={searchQuery}
+                 onChange={(e) => dispatch(setSearchQuery(e.target.value))}
+               />
 
               {/* Bell with low stock popover */}
               <Popover>
