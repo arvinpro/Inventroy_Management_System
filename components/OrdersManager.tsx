@@ -410,7 +410,7 @@ export default function SalesForm() {
             );
             const productName = product?.name || product?.title || "";
             return (
-              <TableRow key={s.id}>
+              <TableRow key={`${s.id}-${s.productId}-${idx}`}>
                 <TableCell>
                   {idx + 1 + (currentPage - 1) * itemsPerPage}
                 </TableCell>

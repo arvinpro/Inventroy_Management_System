@@ -14,6 +14,7 @@ import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip as ReToolti
 import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // ---------------- Types ----------------
 type Book = { id: number; title: string; author: string; quantity: number; price: number; sold?: number };
@@ -34,6 +35,8 @@ export default function ProfessionalReport() {
   const [topSellingItemsReport, setTopSellingItemsReport] = useState<TopSelling[]>([]);
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [paymentStatusCounts, setPaymentStatusCounts] = useState<Record<string, number>>({});
+  const [reportPeriod, setReportPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('daily');
+  const [filteredData, setFilteredData] = useState<any>(null);
   const lowStockThreshold = 10;
 
   // ---------------- Fetch Data ----------------
@@ -87,6 +90,60 @@ export default function ProfessionalReport() {
     fetchData();
   }, []);
 
+  // ---------------- Filter Data by Period ----------------
+  useEffect(() => {
+    const filterDataByPeriod = () => {
+      const now = new Date();
+      let startDate: Date;
+      let endDate: Date = new Date(now);
+
+      switch (reportPeriod) {
+        case 'daily':
+          startDate = new Date(now);
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        case 'weekly':
+          startDate = new Date(now);
+          startDate.setDate(now.getDate() - 7);
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        case 'monthly':
+          startDate = new Date(now);
+          startDate.setMonth(now.getMonth() - 1);
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        case 'yearly':
+          startDate = new Date(now);
+          startDate.setFullYear(now.getFullYear() - 1);
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        default:
+          startDate = new Date(now);
+          startDate.setHours(0, 0, 0, 0);
+      }
+
+      // Filter orders by date range
+      const filteredOrders = recentOrders.filter(order => {
+        const orderDate = new Date(order.createdAt);
+        return orderDate >= startDate && orderDate <= endDate;
+      });
+
+      // Calculate period-specific metrics
+      const periodRevenue = filteredOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
+      const periodOrders = filteredOrders.length;
+
+      setFilteredData({
+        orders: filteredOrders,
+        revenue: periodRevenue,
+        orderCount: periodOrders,
+        startDate,
+        endDate
+      });
+    };
+
+    filterDataByPeriod();
+  }, [reportPeriod, recentOrders]);
+
   // ---------------- Calculations ----------------
   const totalBooksStock = books.reduce((sum, b) => sum + b.quantity, 0);
   const totalItemsStock = items.reduce((sum, i) => sum + i.quantity, 0);
@@ -138,9 +195,25 @@ export default function ProfessionalReport() {
     <div className="p-6 space-y-6">
       <h1 className="text-3xl font-bold">Professional Report</h1>
 
-      {/* ---------------- Summary Cards ---------------- */}
-      <TooltipProvider>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 text-white">
+      <Tabs value={reportPeriod} onValueChange={(value) => setReportPeriod(value as any)} className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="daily">Daily</TabsTrigger>
+          <TabsTrigger value="weekly">Weekly</TabsTrigger>
+          <TabsTrigger value="monthly">Monthly</TabsTrigger>
+          <TabsTrigger value="yearly">Yearly</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value={reportPeriod} className="space-y-6">
+          <div className="text-center mb-4">
+            <h2 className="text-xl font-semibold capitalize">{reportPeriod} Report</h2>
+            <p className="text-sm text-gray-600">
+              {filteredData ? `From ${filteredData.startDate.toLocaleDateString()} to ${filteredData.endDate.toLocaleDateString()}` : ''}
+            </p>
+          </div>
+
+        {/* ---------------- Summary Cards ---------------- */}
+        <TooltipProvider>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 text-white">
           <Card className="bg-gray-900 hover:shadow-lg">
             <CardHeader className="flex justify-between items-center">
               <div>
@@ -208,17 +281,17 @@ export default function ProfessionalReport() {
               </Tooltip>
             </CardHeader>
           </Card>
+          </div>
+        </TooltipProvider>
+
+        {/* ---------------- Export Buttons ---------------- */}
+        <div className="flex gap-2 mt-4">
+          <button onClick={exportCSV} className="bg-green-500 text-white px-3 py-1 rounded">Export CSV</button>
+          <button onClick={exportPDF} className="bg-blue-500 text-white px-3 py-1 rounded">Export PDF</button>
         </div>
-      </TooltipProvider>
 
-      {/* ---------------- Export Buttons ---------------- */}
-      <div className="flex gap-2 mt-4">
-        <button onClick={exportCSV} className="bg-green-500 text-white px-3 py-1 rounded">Export CSV</button>
-        <button onClick={exportPDF} className="bg-blue-500 text-white px-3 py-1 rounded">Export PDF</button>
-      </div>
-
-      {/* ---------------- Extra Summary & Charts ---------------- */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+        {/* ---------------- Extra Summary & Charts ---------------- */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
         <Card className="bg-gray-900 hover:shadow-lg">
           <CardHeader className="flex justify-between items-center">
             <div>
@@ -258,8 +331,8 @@ export default function ProfessionalReport() {
         </Card>
       </div>
 
-      <Card className="mt-6">
-        <CardHeader><CardTitle>Revenue - Last 7 days</CardTitle></CardHeader>
+        <Card className="mt-6">
+          <CardHeader><CardTitle>Revenue - Last 7 days</CardTitle></CardHeader>
         <CardContent>
           <div style={{ width: "100%", height: 240 }}>
             <ResponsiveContainer width="100%" height={240}>
@@ -275,9 +348,9 @@ export default function ProfessionalReport() {
         </CardContent>
       </Card>
 
-      {/* ---------------- Top Selling Books ---------------- */}
-      <Card className="mt-6">
-        <CardHeader><CardTitle>Top Selling Books</CardTitle></CardHeader>
+        {/* ---------------- Top Selling Books ---------------- */}
+        <Card className="mt-6">
+          <CardHeader><CardTitle>Top Selling Books</CardTitle></CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
@@ -304,9 +377,9 @@ export default function ProfessionalReport() {
         </CardContent>
       </Card>
 
-      {/* ---------------- Top Selling Items (books+items aggregated) ---------------- */}
-      <Card className="mt-6">
-        <CardHeader><CardTitle>Top Selling Items</CardTitle></CardHeader>
+        {/* ---------------- Top Selling Items (books+items aggregated) ---------------- */}
+        <Card className="mt-6">
+          <CardHeader><CardTitle>Top Selling Items</CardTitle></CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
@@ -331,9 +404,9 @@ export default function ProfessionalReport() {
         </CardContent>
       </Card>
 
-      {/* ---------------- Low Stock Items ---------------- */}
-      <Card className="mt-6">
-        <CardHeader><CardTitle>Low Stock</CardTitle></CardHeader>
+        {/* ---------------- Low Stock Items ---------------- */}
+        <Card className="mt-6">
+          <CardHeader><CardTitle>Low Stock</CardTitle></CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
@@ -356,9 +429,9 @@ export default function ProfessionalReport() {
         </CardContent>
       </Card>
 
-      {/* ---------------- Recent Orders ---------------- */}
-      <Card className="mt-6">
-        <CardHeader><CardTitle>Recent Orders</CardTitle></CardHeader>
+        {/* ---------------- Recent Orders ---------------- */}
+        <Card className="mt-6">
+          <CardHeader><CardTitle>Recent Orders</CardTitle></CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
@@ -388,6 +461,87 @@ export default function ProfessionalReport() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* ---------------- Period-specific Summary ---------------- */}
+      {filteredData && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+          <Card className="bg-blue-900 hover:shadow-lg">
+            <CardHeader className="flex justify-between items-center">
+              <div>
+                <CardTitle className="text-sm text-white">Period Orders</CardTitle>
+                <p className="text-2xl font-bold text-white">{filteredData.orderCount}</p>
+              </div>
+              <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
+                <Box className="w-6 h-6" />
+              </div>
+            </CardHeader>
+          </Card>
+
+          <Card className="bg-green-900 hover:shadow-lg">
+            <CardHeader className="flex justify-between items-center">
+              <div>
+                <CardTitle className="text-sm text-white">Period Revenue</CardTitle>
+                <p className="text-2xl font-bold text-white">{currency(filteredData.revenue)}</p>
+              </div>
+              <div className="p-3 bg-green-50 text-green-600 rounded-xl">
+                <CircleDollarSign className="w-6 h-6" />
+              </div>
+            </CardHeader>
+          </Card>
+
+          <Card className="bg-purple-900 hover:shadow-lg">
+            <CardHeader className="flex justify-between items-center">
+              <div>
+                <CardTitle className="text-sm text-white">Avg Order Value</CardTitle>
+                <p className="text-2xl font-bold text-white">
+                  {filteredData.orderCount ? currency(filteredData.revenue / filteredData.orderCount) : "-"}
+                </p>
+              </div>
+              <div className="p-3 bg-purple-50 text-purple-600 rounded-xl">
+                <TrendingUp className="w-6 h-6" />
+              </div>
+            </CardHeader>
+          </Card>
+        </div>
+      )}
+
+      {/* ---------------- Period Orders Table ---------------- */}
+      {filteredData && (
+        <Card className="mt-6">
+          <CardHeader><CardTitle>{reportPeriod.charAt(0).toUpperCase() + reportPeriod.slice(1)} Orders</CardTitle></CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>#</TableHead>
+                  <TableHead>Order ID</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Total</TableHead>
+                  <TableHead>Paid</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredData.orders.map((o: RecentOrder, idx: number) => (
+                  <TableRow key={o.id}>
+                    <TableCell>{idx+1}</TableCell>
+                    <TableCell>{o.id}</TableCell>
+                    <TableCell>{o.customer?.name || "-"}</TableCell>
+                    <TableCell>{currency(Number(o.totalAmount || 0))}</TableCell>
+                    <TableCell>{currency(Number(o.paidAmount || 0))}</TableCell>
+                    <TableCell>{o.paymentStatus}</TableCell>
+                    <TableCell>{new Date(o.createdAt).toLocaleDateString()}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

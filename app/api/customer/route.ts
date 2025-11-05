@@ -58,9 +58,9 @@ export async function POST(req: NextRequest) {
   try {
     const { name, email, phone, address, type } = await req.json();
 
-    if (!name || !email || !type) {
+    if (!name || !type) {
       return NextResponse.json(
-        { error: "Name, Email, and Type are required" },
+        { error: "Name and Type are required" },
         { status: 400 }
       );
     }
